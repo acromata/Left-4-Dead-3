@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "L4D3/DataAsset/GunData.h"
+#include "L4D3/Pickup/WeaponPickup.h"
 #include "PlayerCharacter.generated.h"
 
 UCLASS()
@@ -40,6 +41,8 @@ protected:
 	class UInputAction* FireAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enhanced Input")
 	class UInputAction* ReloadAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enhanced Input")
+	class UInputAction* InteractAction;
 
 
 public:
@@ -94,5 +97,19 @@ protected:
 	void Reload();
 	void EnableShooting() { bCanShoot = true; }
 
+	// Health
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Health")
+	int32 MaxHealth;
+	UPROPERTY(BlueprintReadWrite, Category = "Health")
+	int32 CurrentHealth;
 
+	// When below 40, slow down movement
+
+	// Interact
+	void Interact();
+
+public:
+
+	UPROPERTY(BlueprintReadOnly)
+	AWeaponPickup* GunInRange;
 };

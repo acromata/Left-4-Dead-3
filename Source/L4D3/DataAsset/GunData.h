@@ -6,6 +6,12 @@
 #include "Engine/DataAsset.h"
 #include "GunData.generated.h"
 
+UENUM(BlueprintType)
+enum EWeaponType : uint8
+{
+	Primary,
+	Secondary
+};
 /**
  * 
  */
@@ -28,6 +34,10 @@ public:
 	float TimeBetweenShots;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float BulletRange;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TEnumAsByte<EWeaponType> WeaponType;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	USoundBase* GunSound;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	int32 AmmoInMag;

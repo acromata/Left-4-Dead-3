@@ -7,6 +7,7 @@
 #include "EnhancedInputComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 
 // Sets default values
@@ -32,6 +33,9 @@ APlayerCharacter::APlayerCharacter()
 	// Shooting
 	bCanShoot = true;
 	TotalAmmo = 120;
+
+	// Health
+	MaxHealth = 100;
 }
 
 // Called when the game starts or when spawned
@@ -55,7 +59,11 @@ void APlayerCharacter::BeginPlay()
 	{
 		EquippedWeapon->AmmoInMag = EquippedWeapon->BulletCapacity;
 	}
+
+	// Health
+	CurrentHealth = MaxHealth;
 }
+	
 
 // Called every frame
 void APlayerCharacter::Tick(float DeltaTime)
@@ -90,6 +98,8 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 		Input->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Fire);
 		Input->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayerCharacter::CallReload);
+
+		Input->BindAction(InteractAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Interact);
 
 	}
 }
@@ -173,7 +183,11 @@ void APlayerCharacter::Fire()
 			// Subtract ammo
 			EquippedWeapon->AmmoInMag--;
 
+			// Play gun sound
+			UGameplayStatics::PlaySound2D(GetWorld(), EquippedWeapon->GunSound);
+
 			// Time between shots
+			bCanShoot = false;
 			FTimerHandle TBSTimer;
 			GetWorld()->GetTimerManager().SetTimer(TBSTimer, this, &APlayerCharacter::EnableShooting, EquippedWeapon->TimeBetweenShots);
 		}
@@ -204,4 +218,26 @@ void APlayerCharacter::Reload()
 	bIsReloading = false;
 }
 
+void APlayerCharacter::Interact()
+{
+	// Pickup gun
+	if (IsValid(GunInRange))
+	{
+		UGunData* Gun = GunInRange->GunData;
+		if (Gun->WeaponType == EWeaponType::Primary)
+		{
+			PrimaryWeapon = Gun;
+		}
+		else
+		{
+			SecondaryWeapon = Gun;
+		}
 
+		// Set mesh
+		EquippedWeapon = Gun;
+		WeaponMesh->SetStaticMesh(Gun->Mesh);
+
+		// Destroy pickup
+		GunInRange->Destroy();
+	}
+}
