@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/DataAsset.h"
+#include "../DataAsset/ItemData.h"
 #include "GunData.generated.h"
 
 UENUM(BlueprintType)
@@ -16,14 +16,12 @@ enum EWeaponType : uint8
  * 
  */
 UCLASS()
-class L4D3_API UGunData : public UDataAsset
+class L4D3_API UGunData : public UItemData
 {
 	GENERATED_BODY()
 	
 public:
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	class UStaticMesh* Mesh;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 Damage;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

@@ -20,7 +20,7 @@ void AWeaponPickup::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	Mesh->SetStaticMesh(GunData->Mesh);
+	Mesh->SetStaticMesh(ItemData->Mesh);
 
 	SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &AWeaponPickup::OnOverlapBegin);
 	SphereCollision->OnComponentEndOverlap.AddDynamic(this, &AWeaponPickup::OnOverlapEnd);
@@ -32,7 +32,7 @@ void AWeaponPickup::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* 
 	APlayerCharacter* Player = Cast<APlayerCharacter>(OtherActor);
 	if (IsValid(Player))
 	{
-		Player->GunInRange = this;
+		Player->ItemInRange = this;
 	}
 }
 
@@ -41,7 +41,7 @@ void AWeaponPickup::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* Ot
 	APlayerCharacter* Player = Cast<APlayerCharacter>(OtherActor);
 	if (IsValid(Player))
 	{
-		Player->GunInRange = nullptr;
+		Player->ItemInRange = nullptr;
 	}
 }
 

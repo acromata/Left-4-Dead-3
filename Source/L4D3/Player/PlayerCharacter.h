@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "L4D3/DataAsset/GunData.h"
+#include "L4D3/DataAsset/HealthItemData.h"
 #include "L4D3/Pickup/WeaponPickup.h"
 #include "PlayerCharacter.generated.h"
 
@@ -19,7 +20,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	class UCameraComponent* Camera;
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	class UStaticMeshComponent* WeaponMesh;
+	class UStaticMeshComponent* ItemMesh;
 
 protected:
 
@@ -75,18 +76,22 @@ protected:
 	float SprintSpeed;
 	float WalkSpeed;
 
-	// Attacking
+	// Use Item
 	void Fire();
-	
-	// Guns
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack")
-	UGunData* PrimaryWeapon;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack")
-	UGunData* SecondaryWeapon;
+
 	UPROPERTY(BlueprintReadWrite)
-	UGunData* EquippedWeapon;
+	UItemData* EquippedItem;
+	
+	// Weapons
+	void Shoot(UGunData* EquippedWeapon);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Items")
+	UGunData* PrimaryWeapon;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Items")
+	UGunData* SecondaryWeapon;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TotalAmmo;
+	UPROPERTY(BlueprintReadWrite)
+	int32 AmmoInMag;
 	UPROPERTY(BlueprintReadOnly)
 	bool bCanShoot;
 	UPROPERTY(BlueprintReadOnly)
@@ -97,11 +102,26 @@ protected:
 	void Reload();
 	void EnableShooting() { bCanShoot = true; }
 
+	// Healing
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Items")
+	UHealthItemData* HealingItem;
+
 	// Health
+	UFUNCTION(BlueprintCallable)
+	void Damage(int32 Damage);
+	UFUNCTION(BlueprintCallable)
+	void Heal(int32 HealthToAdd, bool bIsTemporary = false);
+
+	void SubtractTempHealth();
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Health")
 	int32 MaxHealth;
-	UPROPERTY(BlueprintReadWrite, Category = "Health")
+	UPROPERTY(BlueprintReadWrite)
 	int32 CurrentHealth;
+	UPROPERTY(BlueprintReadOnly)
+	int32 TemporaryHealth;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Health")
+	float TemporaryHealthDecayRate;
 
 	// When below 40, slow down movement
 
@@ -111,5 +131,5 @@ protected:
 public:
 
 	UPROPERTY(BlueprintReadOnly)
-	AWeaponPickup* GunInRange;
+	AWeaponPickup* ItemInRange;
 };

@@ -22,8 +22,8 @@ APlayerCharacter::APlayerCharacter()
 	Camera->bUsePawnControlRotation = true;
 
 	// Weapon
-	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>("Weapon Mesh");
-	WeaponMesh->SetupAttachment(Camera);
+	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>("Item Mesh");
+	ItemMesh->SetupAttachment(Camera);
 
 	// Speed
 	SprintSpeed = 600.f;
@@ -36,32 +36,19 @@ APlayerCharacter::APlayerCharacter()
 
 	// Health
 	MaxHealth = 100;
+	TemporaryHealthDecayRate = 3.f;
 }
 
 // Called when the game starts or when spawned
 void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	// Set equipped weapon
-	if (IsValid(PrimaryWeapon))
-	{
-		EquippedWeapon = PrimaryWeapon;
-		WeaponMesh->SetStaticMesh(EquippedWeapon->Mesh);
-	}
-	else if (IsValid(SecondaryWeapon))
-	{
-		EquippedWeapon = SecondaryWeapon;
-		WeaponMesh->SetStaticMesh(EquippedWeapon->Mesh);
-	}
-
-	if (IsValid(EquippedWeapon))
-	{
-		EquippedWeapon->AmmoInMag = EquippedWeapon->BulletCapacity;
-	}
 
 	// Health
 	CurrentHealth = MaxHealth;
+
+	FTimerHandle TempHealthTimer;
+	GetWorld()->GetTimerManager().SetTimer(TempHealthTimer, this, &APlayerCharacter::SubtractTempHealth, TemporaryHealthDecayRate, true);
 }
 	
 
@@ -155,89 +142,164 @@ void APlayerCharacter::EndCrouch()
 
 void APlayerCharacter::Fire()
 {
-	if (IsValid(EquippedWeapon))
+	if (UGunData* EquippedWeapon = Cast<UGunData>(EquippedItem))
 	{
 		if (EquippedWeapon->AmmoInMag > 0 && bCanShoot && !bIsReloading)
 		{
-			// Line Trace Setup
-			FVector StartLocation = WeaponMesh->GetSocketLocation("FireLocation");
-			FVector EndLocation = StartLocation + (Camera->GetComponentRotation().Vector() * EquippedWeapon->BulletRange);
-			FHitResult HitResult;
-			FCollisionQueryParams ColParams;
-			ColParams.AddIgnoredActor(this);
-
-			// Line Trace
-			bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, ColParams);
-			if (bHit)
-			{
-				AActor* HitActor = HitResult.GetActor();
-				if (IsValid(HitActor))
-				{
-					HitActor->Destroy();
-				}
-			}
-
-			// Debug
-			DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Red, false, 1.f);
-
-			// Subtract ammo
-			EquippedWeapon->AmmoInMag--;
-
-			// Play gun sound
-			UGameplayStatics::PlaySound2D(GetWorld(), EquippedWeapon->GunSound);
-
-			// Time between shots
-			bCanShoot = false;
-			FTimerHandle TBSTimer;
-			GetWorld()->GetTimerManager().SetTimer(TBSTimer, this, &APlayerCharacter::EnableShooting, EquippedWeapon->TimeBetweenShots);
+			Shoot(EquippedWeapon);
 		}
 	}
+	else if(UHealthItemData* EquippedHealth = Cast<UHealthItemData>(EquippedItem))
+	{
+		Heal(EquippedHealth->HealthToHeal, EquippedHealth->bIsTemporary);
+	}
+}
+
+void APlayerCharacter::Shoot(UGunData* EquippedWeapon)
+{
+	// Line Trace Setup
+	FVector StartLocation = ItemMesh->GetSocketLocation("FireLocation");
+	FVector EndLocation = StartLocation + (Camera->GetComponentRotation().Vector() * EquippedWeapon->BulletRange);
+	FHitResult HitResult;
+	FCollisionQueryParams ColParams;
+	ColParams.AddIgnoredActor(this);
+
+	// Line Trace
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, ColParams);
+	if (bHit)
+	{
+		AActor* HitActor = HitResult.GetActor();
+		if (IsValid(HitActor))
+		{
+			HitActor->Destroy();
+		}
+	}
+
+	// Debug
+	DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Red, false, 1.f);
+
+	// Subtract ammo
+	EquippedWeapon->AmmoInMag--;
+	AmmoInMag = EquippedWeapon->AmmoInMag;
+
+	// Play gun sound
+	UGameplayStatics::PlaySound2D(GetWorld(), EquippedWeapon->GunSound);
+
+	// Time between shots
+	bCanShoot = false;
+	FTimerHandle TBSTimer;
+	GetWorld()->GetTimerManager().SetTimer(TBSTimer, this, &APlayerCharacter::EnableShooting, EquippedWeapon->TimeBetweenShots);
 }
 
 void APlayerCharacter::CallReload()
 {
-	if (!bIsReloading)
+	UGunData* EquippedWeapon = Cast<UGunData>(EquippedItem);
+	if (!bIsReloading && IsValid(EquippedWeapon))
 	{
 		FTimerHandle ReloadTimer;
 		GetWorld()->GetTimerManager().SetTimer(ReloadTimer, this, &APlayerCharacter::Reload, 1);
 		bIsReloading = true;
 	}
-
 }
 
 void APlayerCharacter::Reload()
 {
-	// Takes out ammo
-	TotalAmmo += EquippedWeapon->AmmoInMag;
-	EquippedWeapon->AmmoInMag = 0;
+	UGunData* EquippedWeapon = Cast<UGunData>(EquippedItem);
+	if (IsValid(EquippedWeapon))
+	{
+		// Takes out ammo
+		TotalAmmo += EquippedWeapon->AmmoInMag;
+		EquippedWeapon->AmmoInMag = 0;
 
-	// Adds Ammo
-	EquippedWeapon->AmmoInMag = FMath::Clamp(EquippedWeapon->AmmoInMag + EquippedWeapon->BulletCapacity, 0, TotalAmmo);
-	TotalAmmo = FMath::Clamp(TotalAmmo - EquippedWeapon->BulletCapacity, 0, 990);
+		// Adds Ammo
+		EquippedWeapon->AmmoInMag = FMath::Clamp(EquippedWeapon->AmmoInMag + EquippedWeapon->BulletCapacity, 0, TotalAmmo);
+		AmmoInMag = EquippedWeapon->AmmoInMag;
+		TotalAmmo = FMath::Clamp(TotalAmmo - EquippedWeapon->BulletCapacity, 0, 990);
 
-	bIsReloading = false;
+		bIsReloading = false;
+	}
 }
 
 void APlayerCharacter::Interact()
 {
 	// Pickup gun
-	if (IsValid(GunInRange))
+	if (IsValid(ItemInRange))
 	{
-		UGunData* Gun = GunInRange->GunData;
-		if (Gun->WeaponType == EWeaponType::Primary)
+		// If gun
+		UItemData* Item = ItemInRange->ItemData;
+		if (UGunData* Gun = Cast<UGunData>(Item))
 		{
-			PrimaryWeapon = Gun;
+			if (Gun->WeaponType == EWeaponType::Primary)
+			{
+				PrimaryWeapon = Gun;
+			}
+			else
+			{
+				SecondaryWeapon = Gun;
+			}
+		}
+		// If healing
+		else if (UHealthItemData* Health = Cast<UHealthItemData>(Item))
+		{
+			HealingItem = Health;
+		}
+
+
+		// Set mesh
+		EquippedItem = Item;
+		ItemMesh->SetStaticMesh(Item->Mesh);
+
+		// Destroy pickup
+		ItemInRange->Destroy();
+	}
+}
+
+void APlayerCharacter::Damage(int32 Damage)
+{
+	// Check if player has temporary health
+	if (TemporaryHealth <= 0)
+	{
+		// Subtract health
+		CurrentHealth = FMath::Clamp(CurrentHealth -= Damage, 0, MaxHealth);
+
+		// Die
+		if (CurrentHealth <= 0)
+		{
+			// Die
+		}
+	}
+	else
+	{
+		// Subtract temporary health
+		TemporaryHealth = FMath::Clamp(TemporaryHealth -= Damage, 0, MaxHealth);
+	}
+
+}
+
+void APlayerCharacter::Heal(int32 HealthToAdd, bool bIsTemporary)
+{
+	if (CurrentHealth < MaxHealth)
+	{
+		if (bIsTemporary)
+		{
+			if (CurrentHealth + TemporaryHealth < MaxHealth)
+			{
+				TemporaryHealth = FMath::Clamp(TemporaryHealth += HealthToAdd, 0, MaxHealth - CurrentHealth);
+			}
 		}
 		else
 		{
-			SecondaryWeapon = Gun;
+			CurrentHealth = FMath::Clamp(CurrentHealth += HealthToAdd, 0, MaxHealth);
 		}
 
-		// Set mesh
-		EquippedWeapon = Gun;
-		WeaponMesh->SetStaticMesh(Gun->Mesh);
-
-		// Destroy pickup
-		GunInRange->Destroy();
+		EquippedItem = nullptr;
+		HealingItem = nullptr;
+		ItemMesh->SetStaticMesh(nullptr);
 	}
+
+}
+
+void APlayerCharacter::SubtractTempHealth()
+{
+	TemporaryHealth = FMath::Clamp(TemporaryHealth = TemporaryHealth - 1, 0, MaxHealth - CurrentHealth);
 }

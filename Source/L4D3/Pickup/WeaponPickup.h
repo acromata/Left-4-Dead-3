@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "../DataAsset/GunData.h"
+#include "../DataAsset/ItemData.h"
 #include "WeaponPickup.generated.h"
 
 UCLASS()
@@ -37,6 +37,6 @@ protected:
 public:
 
 	UPROPERTY(EditAnywhere, Category = "Item")
-	UGunData* GunData;
+	UItemData* ItemData;
 
 };
