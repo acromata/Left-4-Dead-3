@@ -8,7 +8,7 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
-
+#include "Components/SphereComponent.h"
 
 // Sets default values
 APlayerCharacter::APlayerCharacter()
@@ -87,6 +87,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		Input->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayerCharacter::CallReload);
 
 		Input->BindAction(InteractAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Interact);
+		Input->BindAction(DropItemAction, ETriggerEvent::Triggered, this, &APlayerCharacter::DropEquippedItem);
 
 	}
 }
@@ -180,7 +181,6 @@ void APlayerCharacter::Shoot(UGunData* EquippedWeapon)
 
 	// Subtract ammo
 	EquippedWeapon->AmmoInMag--;
-	AmmoInMag = EquippedWeapon->AmmoInMag;
 
 	// Play gun sound
 	UGameplayStatics::PlaySound2D(GetWorld(), EquippedWeapon->GunSound);
@@ -213,7 +213,6 @@ void APlayerCharacter::Reload()
 
 		// Adds Ammo
 		EquippedWeapon->AmmoInMag = FMath::Clamp(EquippedWeapon->AmmoInMag + EquippedWeapon->BulletCapacity, 0, TotalAmmo);
-		AmmoInMag = EquippedWeapon->AmmoInMag;
 		TotalAmmo = FMath::Clamp(TotalAmmo - EquippedWeapon->BulletCapacity, 0, 990);
 
 		bIsReloading = false;
@@ -229,21 +228,39 @@ void APlayerCharacter::Interact()
 		UItemData* Item = ItemInRange->ItemData;
 		if (UGunData* Gun = Cast<UGunData>(Item))
 		{
-			if (Gun->WeaponType == EWeaponType::Primary)
+			if (Gun->ItemType == EItemType::Primary)
 			{
+				DropItem(PrimaryWeapon);
+
+				// Pickup weapon
 				PrimaryWeapon = Gun;
 			}
 			else
 			{
+				DropItem(SecondaryWeapon);
+
+				// Pickup weapon
 				SecondaryWeapon = Gun;
 			}
 		}
 		// If healing
 		else if (UHealthItemData* Health = Cast<UHealthItemData>(Item))
 		{
-			HealingItem = Health;
-		}
+			if (Health->ItemType == EItemType::Primary)
+			{
+				DropItem(PrimaryHealingItem);
 
+				// Pickup item
+				PrimaryHealingItem = Health;
+			}
+			else
+			{
+				DropItem(SecondaryHealingItem);
+
+				// Pickup item
+				SecondaryHealingItem = Health;
+			}		
+		}
 
 		// Set mesh
 		EquippedItem = Item;
@@ -292,8 +309,16 @@ void APlayerCharacter::Heal(int32 HealthToAdd, bool bIsTemporary)
 			CurrentHealth = FMath::Clamp(CurrentHealth += HealthToAdd, 0, MaxHealth);
 		}
 
+		if (EquippedItem->ItemType = EItemType::Primary)
+		{
+			PrimaryHealingItem = nullptr;
+		}
+		else
+		{
+			SecondaryHealingItem = nullptr;
+		}
+
 		EquippedItem = nullptr;
-		HealingItem = nullptr;
 		ItemMesh->SetStaticMesh(nullptr);
 	}
 
@@ -302,4 +327,24 @@ void APlayerCharacter::Heal(int32 HealthToAdd, bool bIsTemporary)
 void APlayerCharacter::SubtractTempHealth()
 {
 	TemporaryHealth = FMath::Clamp(TemporaryHealth = TemporaryHealth - 1, 0, MaxHealth - CurrentHealth);
+}
+
+void APlayerCharacter::DropEquippedItem()
+{
+	DropItem(EquippedItem);
+	EquippedItem = nullptr;
+	ItemMesh->SetStaticMesh(nullptr);
+}
+
+void APlayerCharacter::DropItem(UItemData* Item)
+{
+	if (IsValid(Item))
+	{
+		AWeaponPickup* ItemDrop = GetWorld()->SpawnActor<AWeaponPickup>(GetActorLocation(), GetActorRotation());
+		ItemDrop->ItemData = Item;
+		ItemDrop->Mesh->SetStaticMesh(Item->Mesh);
+		ItemDrop->SphereCollision->SetSimulatePhysics(true);
+
+		GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::White, (TEXT("Item Dropped: %s"), Item->GetName()));
+	}
 }

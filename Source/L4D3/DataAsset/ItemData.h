@@ -6,9 +6,13 @@
 #include "Engine/DataAsset.h"
 #include "ItemData.generated.h"
 
-/**
- * 
- */
+UENUM(BlueprintType)
+enum EItemType : uint8
+{
+	Primary,
+	Secondary
+};
+
 UCLASS()
 class L4D3_API UItemData : public UDataAsset
 {
@@ -18,4 +22,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	class UStaticMesh* Mesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TEnumAsByte<EItemType> ItemType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UTexture2D* ItemIcon;
 };

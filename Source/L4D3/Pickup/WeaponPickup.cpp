@@ -10,21 +10,20 @@ AWeaponPickup::AWeaponPickup()
 {
 	SphereCollision = CreateDefaultSubobject<USphereComponent>("Collision");
 	SphereCollision->SetupAttachment(RootComponent);
+	SphereCollision->SetSphereRadius(60.f);
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>("Mesh");
 	Mesh->SetupAttachment(SphereCollision);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
 }
 
 // Called when the game starts or when spawned
 void AWeaponPickup::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	Mesh->SetStaticMesh(ItemData->Mesh);
 
-	SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &AWeaponPickup::OnOverlapBegin);
-	SphereCollision->OnComponentEndOverlap.AddDynamic(this, &AWeaponPickup::OnOverlapEnd);
-
+	FTimerHandle Timer;
+	GetWorld()->GetTimerManager().SetTimer(Timer, this, &AWeaponPickup::BeginPlayDelay, .5f);
 }
 
 void AWeaponPickup::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -42,6 +41,17 @@ void AWeaponPickup::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* Ot
 	if (IsValid(Player))
 	{
 		Player->ItemInRange = nullptr;
+	}
+}
+
+void AWeaponPickup::BeginPlayDelay()
+{
+	SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &AWeaponPickup::OnOverlapBegin);
+	SphereCollision->OnComponentEndOverlap.AddDynamic(this, &AWeaponPickup::OnOverlapEnd);
+
+	if (IsValid(ItemData))
+	{
+		Mesh->SetStaticMesh(ItemData->Mesh);
 	}
 }
 

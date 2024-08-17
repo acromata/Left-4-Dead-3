@@ -44,6 +44,8 @@ protected:
 	class UInputAction* ReloadAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enhanced Input")
 	class UInputAction* InteractAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enhanced Input")
+	class UInputAction* DropItemAction;
 
 
 public:
@@ -90,8 +92,8 @@ protected:
 	UGunData* SecondaryWeapon;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TotalAmmo;
-	UPROPERTY(BlueprintReadWrite)
-	int32 AmmoInMag;
+	//UPROPERTY(BlueprintReadWrite)
+	//int32 AmmoInMag;
 	UPROPERTY(BlueprintReadOnly)
 	bool bCanShoot;
 	UPROPERTY(BlueprintReadOnly)
@@ -104,7 +106,10 @@ protected:
 
 	// Healing
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Items")
-	UHealthItemData* HealingItem;
+	UHealthItemData* PrimaryHealingItem;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Items")
+	UHealthItemData* SecondaryHealingItem;
+
 
 	// Health
 	UFUNCTION(BlueprintCallable)
@@ -127,6 +132,9 @@ protected:
 
 	// Interact
 	void Interact();
+
+	void DropEquippedItem();
+	void DropItem(UItemData* Item);
 
 public:
 

@@ -12,7 +12,7 @@ class L4D3_API AWeaponPickup : public AActor
 {
 	GENERATED_BODY()
 
-protected:
+public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	class USphereComponent* SphereCollision;
@@ -33,6 +33,8 @@ protected:
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 	UFUNCTION()
 	void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	void BeginPlayDelay();
 
 public:
 
