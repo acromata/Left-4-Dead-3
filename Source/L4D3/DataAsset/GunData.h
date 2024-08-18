@@ -29,8 +29,7 @@ public:
 	float BulletRange;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	USoundBase* GunSound;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 AmmoInMag;
 
 };

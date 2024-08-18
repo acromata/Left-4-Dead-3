@@ -9,12 +9,13 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/SphereComponent.h"
+#include "L4D3/Enemy/ZombieAI.h"
 
 // Sets default values
 APlayerCharacter::APlayerCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	// Camera
 	Camera = CreateDefaultSubobject<UCameraComponent>("Camera");
@@ -27,7 +28,7 @@ APlayerCharacter::APlayerCharacter()
 
 	// Speed
 	SprintSpeed = 600.f;
-	WalkSpeed = 350.f;
+	WalkSpeed = 450.f;
 	GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
 
 	// Shooting
@@ -84,6 +85,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		Input->BindAction(CrouchAction, ETriggerEvent::Completed, this, &APlayerCharacter::EndCrouch);
 
 		Input->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Fire);
+		Input->BindAction(FireAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopFire);
 		Input->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayerCharacter::CallReload);
 
 		Input->BindAction(InteractAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Interact);
@@ -145,7 +147,7 @@ void APlayerCharacter::Fire()
 {
 	if (UGunData* EquippedWeapon = Cast<UGunData>(EquippedItem))
 	{
-		if (EquippedWeapon->AmmoInMag > 0 && bCanShoot && !bIsReloading)
+		if (EquippedWeapon->AmmoInMag > 0 && bCanShoot && !bIsReloading && (EquippedWeapon->bIsAutomatic || !bIsShooting))
 		{
 			Shoot(EquippedWeapon);
 		}
@@ -159,7 +161,7 @@ void APlayerCharacter::Fire()
 void APlayerCharacter::Shoot(UGunData* EquippedWeapon)
 {
 	// Line Trace Setup
-	FVector StartLocation = ItemMesh->GetSocketLocation("FireLocation");
+	FVector StartLocation = Camera->GetComponentLocation();
 	FVector EndLocation = StartLocation + (Camera->GetComponentRotation().Vector() * EquippedWeapon->BulletRange);
 	FHitResult HitResult;
 	FCollisionQueryParams ColParams;
@@ -169,10 +171,10 @@ void APlayerCharacter::Shoot(UGunData* EquippedWeapon)
 	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, ColParams);
 	if (bHit)
 	{
-		AActor* HitActor = HitResult.GetActor();
-		if (IsValid(HitActor))
+		AZombieAI* ZombieActor = Cast<AZombieAI>(HitResult.GetActor());
+		if (IsValid(ZombieActor))
 		{
-			HitActor->Destroy();
+			ZombieActor->Damage(EquippedWeapon->Damage);
 		}
 	}
 
@@ -185,10 +187,24 @@ void APlayerCharacter::Shoot(UGunData* EquippedWeapon)
 	// Play gun sound
 	UGameplayStatics::PlaySound2D(GetWorld(), EquippedWeapon->GunSound);
 
+	// Set is shooting
+	bIsShooting = true;
+
 	// Time between shots
 	bCanShoot = false;
+
+	// Enable can shoot after delay
 	FTimerHandle TBSTimer;
 	GetWorld()->GetTimerManager().SetTimer(TBSTimer, this, &APlayerCharacter::EnableShooting, EquippedWeapon->TimeBetweenShots);
+
+}
+
+void APlayerCharacter::StopFire()
+{
+	if (UGunData* EquippedWeapon = Cast<UGunData>(EquippedItem))
+	{
+		bIsShooting = false;
+	}
 }
 
 void APlayerCharacter::CallReload()
@@ -205,7 +221,7 @@ void APlayerCharacter::CallReload()
 void APlayerCharacter::Reload()
 {
 	UGunData* EquippedWeapon = Cast<UGunData>(EquippedItem);
-	if (IsValid(EquippedWeapon))
+	if (IsValid(EquippedWeapon) && EquippedWeapon == PrimaryWeapon)
 	{
 		// Takes out ammo
 		TotalAmmo += EquippedWeapon->AmmoInMag;
@@ -217,57 +233,10 @@ void APlayerCharacter::Reload()
 
 		bIsReloading = false;
 	}
-}
-
-void APlayerCharacter::Interact()
-{
-	// Pickup gun
-	if (IsValid(ItemInRange))
+	else
 	{
-		// If gun
-		UItemData* Item = ItemInRange->ItemData;
-		if (UGunData* Gun = Cast<UGunData>(Item))
-		{
-			if (Gun->ItemType == EItemType::Primary)
-			{
-				DropItem(PrimaryWeapon);
-
-				// Pickup weapon
-				PrimaryWeapon = Gun;
-			}
-			else
-			{
-				DropItem(SecondaryWeapon);
-
-				// Pickup weapon
-				SecondaryWeapon = Gun;
-			}
-		}
-		// If healing
-		else if (UHealthItemData* Health = Cast<UHealthItemData>(Item))
-		{
-			if (Health->ItemType == EItemType::Primary)
-			{
-				DropItem(PrimaryHealingItem);
-
-				// Pickup item
-				PrimaryHealingItem = Health;
-			}
-			else
-			{
-				DropItem(SecondaryHealingItem);
-
-				// Pickup item
-				SecondaryHealingItem = Health;
-			}		
-		}
-
-		// Set mesh
-		EquippedItem = Item;
-		ItemMesh->SetStaticMesh(Item->Mesh);
-
-		// Destroy pickup
-		ItemInRange->Destroy();
+		EquippedWeapon->AmmoInMag = EquippedWeapon->BulletCapacity;
+		bIsReloading = false;
 	}
 }
 
@@ -329,8 +298,77 @@ void APlayerCharacter::SubtractTempHealth()
 	TemporaryHealth = FMath::Clamp(TemporaryHealth = TemporaryHealth - 1, 0, MaxHealth - CurrentHealth);
 }
 
+
+void APlayerCharacter::Interact()
+{
+	// Pickup gun
+	if (IsValid(ItemInRange))
+	{
+		// If gun
+		UItemData* Item = ItemInRange->ItemData;
+		if (UGunData* Gun = Cast<UGunData>(Item))
+		{
+			if (Gun->ItemType == EItemType::Primary)
+			{
+				DropItem(PrimaryWeapon);
+
+				// Pickup weapon
+				PrimaryWeapon = Gun;
+			}
+			else
+			{
+				DropItem(SecondaryWeapon);
+
+				// Pickup weapon
+				SecondaryWeapon = Gun;
+			}
+		}
+		// If healing
+		else if (UHealthItemData* Health = Cast<UHealthItemData>(Item))
+		{
+			if (Health->ItemType == EItemType::Primary)
+			{
+				DropItem(PrimaryHealingItem);
+
+				// Pickup item
+				PrimaryHealingItem = Health;
+			}
+			else
+			{
+				DropItem(SecondaryHealingItem);
+
+				// Pickup item
+				SecondaryHealingItem = Health;
+			}
+		}
+
+		// Set mesh
+		//EquippedItem = Item;
+		//ItemMesh->SetStaticMesh(Item->Mesh);
+
+		// Destroy pickup
+		ItemInRange->Destroy();
+	}
+}
+
 void APlayerCharacter::DropEquippedItem()
 {
+	switch (ItemEquippedEnum)
+	{
+	case EPrimaryWeapon:
+		PrimaryWeapon = nullptr;
+		break;
+	case ESecondaryWeapon:
+		SecondaryWeapon = nullptr;
+		break;
+	case EPrimaryHealing:
+		PrimaryHealingItem = nullptr;
+		break;
+	case ESecondaryHealing:
+		SecondaryHealingItem = nullptr;
+		break;
+	}
+
 	DropItem(EquippedItem);
 	EquippedItem = nullptr;
 	ItemMesh->SetStaticMesh(nullptr);

@@ -10,6 +10,16 @@
 #include "L4D3/Pickup/WeaponPickup.h"
 #include "PlayerCharacter.generated.h"
 
+UENUM(BlueprintType)
+enum EItemEquipped : int8
+{
+	ENone,
+	EPrimaryWeapon,
+	ESecondaryWeapon,
+	EPrimaryHealing,
+	ESecondaryHealing
+};
+
 UCLASS()
 class L4D3_API APlayerCharacter : public ACharacter
 {
@@ -76,10 +86,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MoveSpeed")
 	float SprintSpeed;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MoveSpeed")
 	float WalkSpeed;
 
 	// Use Item
 	void Fire();
+	void StopFire();
 
 	UPROPERTY(BlueprintReadWrite)
 	UItemData* EquippedItem;
@@ -92,12 +104,12 @@ protected:
 	UGunData* SecondaryWeapon;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TotalAmmo;
-	//UPROPERTY(BlueprintReadWrite)
-	//int32 AmmoInMag;
 	UPROPERTY(BlueprintReadOnly)
 	bool bCanShoot;
 	UPROPERTY(BlueprintReadOnly)
 	bool bIsReloading;
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsShooting;
 
 	void CallReload();
 	UFUNCTION(BlueprintCallable)
@@ -112,8 +124,6 @@ protected:
 
 
 	// Health
-	UFUNCTION(BlueprintCallable)
-	void Damage(int32 Damage);
 	UFUNCTION(BlueprintCallable)
 	void Heal(int32 HealthToAdd, bool bIsTemporary = false);
 
@@ -133,11 +143,20 @@ protected:
 	// Interact
 	void Interact();
 
+	// Items
 	void DropEquippedItem();
 	void DropItem(UItemData* Item);
+	
+	UFUNCTION(BlueprintCallable)
+	void SetItemEquippedEnum(EItemEquipped Item) { ItemEquippedEnum = Item; }
+
+	EItemEquipped ItemEquippedEnum;
 
 public:
 
 	UPROPERTY(BlueprintReadOnly)
 	AWeaponPickup* ItemInRange;
+
+	UFUNCTION(BlueprintCallable)
+	void Damage(int32 Damage);
 };
