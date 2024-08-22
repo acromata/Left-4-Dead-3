@@ -33,6 +33,9 @@ AZombieAI::AZombieAI()
 
 	// Sound
 	ChanceToPlaySound = 5;
+
+	// Zombie
+	RadiusToAlert = 500.f;
 }
 
 // Called when the game starts or when spawned
@@ -56,7 +59,9 @@ void AZombieAI::BeginPlay()
 	StartLocation = GetActorLocation();
 
 	// Health
-	CurrentHealth = MaxHealth;
+	float RandHealth = FMath::RandRange(1, 13);
+	RandHealth /= 10;
+	CurrentHealth = MaxHealth * RandHealth;
 
 	// Set mesh
 	int32 RandNum = FMath::RandRange(0, ZombieMeshes.Num() - 1);
@@ -106,8 +111,8 @@ void AZombieAI::UpdateState(float DeltaTime)
 	}
 
 	// Print state
-	GEngine->AddOnScreenDebugMessage(1, 1.f, FColor::Green, FString::Printf(TEXT("Active State: %s"),
-		*UEnum::GetValueAsString<EEnemyState>(ActiveState)));
+	//GEngine->AddOnScreenDebugMessage(1, 1.f, FColor::Green, FString::Printf(TEXT("Active State: %s"),
+	//	*UEnum::GetValueAsString<EEnemyState>(ActiveState)));
 }
 
 void AZombieAI::IdleState(float DeltaTime)
@@ -139,10 +144,20 @@ void AZombieAI::ChaseState(float DeltaTime)
 			// Attack
 			Target->Damage(AttackDamage);
 
+			// Play sound
 			PlayRandomGrowl();
 
 			// Reset timer
 			TimeSinceLastAttack = 0;
+
+			// Play anim
+			UAnimInstance* AnimationInstance = GetMesh()->GetAnimInstance();
+			if (IsValid(AnimationInstance) && IsValid(AttackAnimation))
+			{
+				AnimationInstance->Montage_Play(AttackAnimation);
+				GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Green, "Attacked");
+			}
+
 		}
 	}
 	else if(DistanceFromTarget <= ChaseDistance)
@@ -166,21 +181,67 @@ void AZombieAI::Damage(int32 Damage)
 	// Subtract health
 	CurrentHealth = FMath::Clamp(CurrentHealth -= Damage, 0, MaxHealth);
 
+	// Alert nearby zombies
+	if (ActiveState != EEnemyState::EChaseState)
+	{
+		// create tarray for hit results
+		TArray<FHitResult> OutHits;
+
+		// create a collision sphere
+		FCollisionShape ColSphere = FCollisionShape::MakeSphere(RadiusToAlert);
+
+		// draw collision sphere
+		DrawDebugSphere(GetWorld(), GetActorLocation(), ColSphere.GetSphereRadius(), 50, FColor::Purple, false, 2.f);
+
+		// check if something got hit in the sweep
+		bool bIsHit = GetWorld()->SweepMultiByChannel(OutHits, GetActorLocation(), GetActorLocation(), FQuat::Identity, ECC_WorldStatic, ColSphere);
+
+		if (bIsHit)
+		{
+			// loop through TArray
+			for (auto& Hit : OutHits)
+			{
+				AZombieAI* ZombieHit = Cast<AZombieAI>(Hit.GetActor());
+				if(IsValid(ZombieHit))
+				{
+					ZombieHit->SetState(EEnemyState::EChaseState);
+				}
+			}
+		}
+	}
+
+	// Chase player on hit
 	SetState(EEnemyState::EChaseState);
 
-	PlayRandomGrowl();
-
-	// Die
+	// Die if no health
 	if (CurrentHealth <= 0)
 	{
-		// Die
-		Destroy();
+		// Play sound
+		PlayRandomGrowl(true);
+
+		// Play anim
+		int8 RandNum = FMath::RandRange(0, DeathAnimations.Num() - 1);
+		if (DeathAnimations.IsValidIndex(RandNum))
+		{
+			GetMesh()->PlayAnimation(DeathAnimations[RandNum], false);
+		}
+
+		// Disable collision
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		bIsDead = true;
+
+	}
+	else
+	{
+		// Play sound
+		PlayRandomGrowl();
 	}
 }
 
-void AZombieAI::PlayRandomGrowl()
+void AZombieAI::PlayRandomGrowl(bool IsGuaranteed)
 {
-	if (FMath::RandRange(0, ChanceToPlaySound) == 0)
+	if ((FMath::RandRange(0, ChanceToPlaySound) == 0 || IsGuaranteed) && !bIsDead)
 	{
 		int32 RandNum = FMath::RandRange(0, GrowlSounds.Num() - 1);
 		if (GrowlSounds.IsValidIndex(RandNum))

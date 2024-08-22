@@ -39,6 +39,7 @@ public:
 protected:
 
 	// Mesh
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mesh")
 	TArray<USkeletalMesh*> ZombieMeshes;
 
 	// Pawn Sensing
@@ -62,6 +63,10 @@ protected:
 	void IdleState(float DeltaTime);
 	void ChaseState(float DeltaTime);
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zombie")
+	float RadiusToAlert;
+
+	// Chase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chasing")
 	float ChaseDistance;
 
@@ -89,15 +94,18 @@ protected:
 	int32 MaxHealth;
 	UPROPERTY(BlueprintReadWrite)
 	int32 CurrentHealth;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Health")
+	TArray<UAnimMontage*> DeathAnimations;
 
 	// Sound
-	void PlayRandomGrowl();
+	void PlayRandomGrowl(bool IsGuaranteed = false);
 
 	UPROPERTY(EditAnywhere, Category = "Sound")
 	TArray<USoundBase*> GrowlSounds;
 	UPROPERTY(EditAnywhere, Category = "Sound")
 	int32 ChanceToPlaySound;
 
+	bool bIsDead;
 public:
 
 	void Damage(int32 Damage);
